@@ -46,7 +46,7 @@
             </visual>
         </link>
         <gazebo reference="${leg}_hip_link">
-            <material>Gazebo/FlatBlack</material>
+            <material>Gazebo/Blue</material>
         </gazebo>
 
         <link name="${leg}_upper_leg_link">
@@ -72,7 +72,7 @@
             </visual>
         </link>
         <gazebo reference="${leg}_upper_leg_link">
-            <material>Gazebo/FlatBlack</material>
+            <material>Gazebo/Blue</material>
         </gazebo>
 
         <link name="${leg}_lower_leg_link">
@@ -104,7 +104,7 @@
             <mu1>0.8</mu1>
             <mu2>0.8</mu2>
             <minDepth>0.05</minDepth>
-            <material>Gazebo/FlatBlack</material>
+            <material>Gazebo/Blue</material>
         </gazebo>
 
         <link name="${leg}_foot_link" />

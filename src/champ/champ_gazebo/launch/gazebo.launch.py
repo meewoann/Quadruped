@@ -10,7 +10,7 @@ from launch.actions import (DeclareLaunchArgument, ExecuteProcess,
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import Command, LaunchConfiguration, PythonExpression
-#test2
+
 def generate_launch_description():
 
     robot_name = LaunchConfiguration("robot_name")

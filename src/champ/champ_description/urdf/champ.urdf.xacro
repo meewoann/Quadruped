@@ -2,7 +2,7 @@
 <robot name="champ" xmlns:xacro="http://ros.org/wiki/xacro">
     <xacro:include filename="$(find champ_description)/urdf/properties.urdf.xacro" />
 
-    <material name="black"><color rgba="1.0 1.0 1.0 1.0" /></material>
+    <material name="black"><color rgba="0.0 0.0 1.0 1.0" /></material>
     
     <link name="base_link">
         
