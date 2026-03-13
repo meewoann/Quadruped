@@ -58,7 +58,7 @@ class MessageRelay: public rclcpp::Node
     rclcpp::Subscription<champ_msgs::msg::Imu>::SharedPtr imu_raw_subscription_;
     rclcpp::Subscription<champ_msgs::msg::Joints>::SharedPtr joints_raw_subscription_;
     rclcpp::Subscription<champ_msgs::msg::Contacts>::SharedPtr foot_contacts_subscription_;
-    
+
     rclcpp::Publisher<champ_msgs::msg::ContactsStamped>::SharedPtr foot_contacts_publisher_;
     rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_states_publisher_;
     rclcpp::Publisher<trajectory_msgs::msg::JointTrajectory>::SharedPtr joint_commands_publisher_;
@@ -73,6 +73,15 @@ class MessageRelay: public rclcpp::Node
     bool has_imu_;
 
     sensor_msgs::msg::Imu imu_data_;
+
+    // EMA low-pass filter state
+    bool imu_filter_initialized_;
+    double accel_alpha_;      // accel smoothing [0=no change, 1=no filter]
+    double gyro_alpha_;       // gyro  smoothing [0=no change, 1=no filter]
+    double orient_alpha_;     // orientation SLERP weight [0=no change, 1=no filter]
+    double accel_x_, accel_y_, accel_z_;
+    double gyro_x_,  gyro_y_,  gyro_z_;
+    tf2::Quaternion orient_filtered_;
 
     void IMURawCallback_(const champ_msgs::msg::Imu::SharedPtr msg);
     void jointStatesRawCallback_(const champ_msgs::msg::Joints::SharedPtr msg);

@@ -26,11 +26,17 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 #include <message_relay.h>
+#include <tf2/LinearMath/Quaternion.h>
 
 MessageRelay::MessageRelay():
-     Node("message_relay_node")
-{    
+     Node("message_relay_node",
+          rclcpp::NodeOptions()
+              .allow_undeclared_parameters(true)
+              .automatically_declare_parameters_from_overrides(true))
+{
     imu_data_.orientation.w = 1.0;
+    imu_filter_initialized_ = false;
+    orient_filtered_.setRPY(0, 0, 0);
 
     foot_contacts_publisher_ = this->create_publisher<champ_msgs::msg::ContactsStamped>("foot_contacts", 1);
 
@@ -48,6 +54,14 @@ MessageRelay::MessageRelay():
 
     this->get_parameter("gazebo",   in_gazebo_);
     this->get_parameter("has_imu",  has_imu_);
+
+    // IMU filter parameters (tunable at launch or via param server)
+    // Alpha: fraction of new sample blended in each step.
+    // Lower = more smoothing (more lag). Higher = less smoothing (less lag).
+    // Reasonable defaults: accel 0.2, gyro 0.3, orient 0.15
+    if (!this->get_parameter("imu_accel_alpha",  accel_alpha_))  accel_alpha_  = 0.2;
+    if (!this->get_parameter("imu_gyro_alpha",   gyro_alpha_))   gyro_alpha_   = 0.3;
+    if (!this->get_parameter("imu_orient_alpha", orient_alpha_)) orient_alpha_ = 0.15;
 
     joint_names_ = champ::URDF::getJointNames(this->get_node_parameters_interface());
 
@@ -79,30 +93,66 @@ void MessageRelay::IMURawCallback_(const champ_msgs::msg::Imu::SharedPtr msg)
     imu_data_msg.header.stamp = this->get_clock()->now();
     imu_data_msg.header.frame_id = imu_frame_;
 
-    imu_data_msg.orientation.w = msg->orientation.w;
-    imu_data_msg.orientation.x = msg->orientation.x;
-    imu_data_msg.orientation.y = msg->orientation.y;
-    imu_data_msg.orientation.z = msg->orientation.z;
+    // --- EMA low-pass filter on accel and gyro ---
+    if (!imu_filter_initialized_)
+    {
+        accel_x_ = msg->linear_acceleration.x;
+        accel_y_ = msg->linear_acceleration.y;
+        accel_z_ = msg->linear_acceleration.z;
+        gyro_x_  = msg->angular_velocity.x;
+        gyro_y_  = msg->angular_velocity.y;
+        gyro_z_  = msg->angular_velocity.z;
+        orient_filtered_ = tf2::Quaternion(
+            msg->orientation.x, msg->orientation.y,
+            msg->orientation.z, msg->orientation.w);
+        orient_filtered_.normalize();
+        imu_filter_initialized_ = true;
+    }
+    else
+    {
+        accel_x_ = accel_alpha_ * msg->linear_acceleration.x + (1.0 - accel_alpha_) * accel_x_;
+        accel_y_ = accel_alpha_ * msg->linear_acceleration.y + (1.0 - accel_alpha_) * accel_y_;
+        accel_z_ = accel_alpha_ * msg->linear_acceleration.z + (1.0 - accel_alpha_) * accel_z_;
+        gyro_x_  = gyro_alpha_  * msg->angular_velocity.x    + (1.0 - gyro_alpha_)  * gyro_x_;
+        gyro_y_  = gyro_alpha_  * msg->angular_velocity.y    + (1.0 - gyro_alpha_)  * gyro_y_;
+        gyro_z_  = gyro_alpha_  * msg->angular_velocity.z    + (1.0 - gyro_alpha_)  * gyro_z_;
 
-    imu_data_msg.linear_acceleration.x = msg->linear_acceleration.x;
-    imu_data_msg.linear_acceleration.y = msg->linear_acceleration.y;
-    imu_data_msg.linear_acceleration.z = msg->linear_acceleration.z;
+        // SLERP-based orientation smoothing
+        tf2::Quaternion q_new(
+            msg->orientation.x, msg->orientation.y,
+            msg->orientation.z, msg->orientation.w);
+        q_new.normalize();
+        // Ensure shortest path
+        if (orient_filtered_.dot(q_new) < 0.0) q_new = -q_new;
+        orient_filtered_ = orient_filtered_.slerp(q_new, orient_alpha_);
+        orient_filtered_.normalize();
+    }
 
-    imu_data_msg.angular_velocity.x = msg->angular_velocity.x;
-    imu_data_msg.angular_velocity.y = msg->angular_velocity.y;
-    imu_data_msg.angular_velocity.z = msg->angular_velocity.z;
+    imu_data_msg.orientation.w = orient_filtered_.w();
+    imu_data_msg.orientation.x = orient_filtered_.x();
+    imu_data_msg.orientation.y = orient_filtered_.y();
+    imu_data_msg.orientation.z = orient_filtered_.z();
 
-    imu_data_msg.orientation_covariance[0] = 0.0025;
-    imu_data_msg.orientation_covariance[4] = 0.0025;
-    imu_data_msg.orientation_covariance[8] = 0.0025;
+    imu_data_msg.linear_acceleration.x = accel_x_;
+    imu_data_msg.linear_acceleration.y = accel_y_;
+    imu_data_msg.linear_acceleration.z = accel_z_;
 
-    imu_data_msg.angular_velocity_covariance[0] = 0.000001;
-    imu_data_msg.angular_velocity_covariance[4] = 0.000001;
-    imu_data_msg.angular_velocity_covariance[8] = 0.000001;
+    imu_data_msg.angular_velocity.x = gyro_x_;
+    imu_data_msg.angular_velocity.y = gyro_y_;
+    imu_data_msg.angular_velocity.z = gyro_z_;
 
-    imu_data_msg.linear_acceleration_covariance[0] = 0.0001;
-    imu_data_msg.linear_acceleration_covariance[4] = 0.0001;
-    imu_data_msg.linear_acceleration_covariance[8] = 0.0001;
+    // Tighter covariances reflect the filtered (less noisy) signal
+    imu_data_msg.orientation_covariance[0] = 0.0010;
+    imu_data_msg.orientation_covariance[4] = 0.0010;
+    imu_data_msg.orientation_covariance[8] = 0.0010;
+
+    imu_data_msg.angular_velocity_covariance[0] = 0.0000005;
+    imu_data_msg.angular_velocity_covariance[4] = 0.0000005;
+    imu_data_msg.angular_velocity_covariance[8] = 0.0000005;
+
+    imu_data_msg.linear_acceleration_covariance[0] = 0.00005;
+    imu_data_msg.linear_acceleration_covariance[4] = 0.00005;
+    imu_data_msg.linear_acceleration_covariance[8] = 0.00005;
 
     imu_mag_msg.header.stamp = this->get_clock()->now();
     imu_mag_msg.header.frame_id = imu_frame_;
