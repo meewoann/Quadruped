@@ -142,12 +142,12 @@ class QuadrupedImuFilter(Node):
         self._prev_contacts  = [False, False, False, False]
 
         # ── Publishers ────────────────────────────────────────────────
-        self._pub = self.create_publisher(Imu, 'imu/data', 10)
+        self._pub = self.create_publisher(Imu, 'imu/data', 50)
         if self.pub_gf:
             self._pub_gf = self.create_publisher(Imu, 'imu/data/gravity_free', 10)
 
         # ── Subscribers ───────────────────────────────────────────────
-        self.create_subscription(Imu, 'imu/data_raw', self._imu_cb, 10)
+        self.create_subscription(Imu, 'imu/data_raw', self._imu_cb, 50)
 
         if self.use_contacts:
             self.create_subscription(
