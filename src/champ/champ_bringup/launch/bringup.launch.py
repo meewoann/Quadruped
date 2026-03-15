@@ -140,6 +140,12 @@ def generate_launch_description():
         "close_loop_odom", default_value="false", description=""
     )
 
+    declare_use_imu_filter = DeclareLaunchArgument(
+        "use_imu_filter",
+        default_value="false",
+        description="Run quadruped IMU filter (imu/data_raw -> imu/data)",
+    )
+
     description_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(
@@ -223,6 +229,18 @@ def generate_launch_description():
         remappings=[("odometry/filtered", "odom")],
     )
 
+    imu_filter_node = Node(
+        package="champ_gazebo",
+        executable="imu_filter_quadruped.py",
+        name="quadruped_imu_filter",
+        output="screen",
+        parameters=[
+            {"use_sim_time": LaunchConfiguration("use_sim_time")},
+            {"use_contacts": True},
+        ],
+        condition=IfCondition(LaunchConfiguration("use_imu_filter")),
+    )
+
     rviz2 = Node(
         package='rviz2',
         namespace='',
@@ -255,11 +273,13 @@ def generate_launch_description():
             declare_publish_foot_contacts,
             declare_publish_odom_tf,
             declare_close_loop_odom,
+            declare_use_imu_filter,
             description_ld,
             quadruped_controller_node,
             state_estimator_node,
             base_to_footprint_ekf,
             footprint_to_odom_ekf,
+            imu_filter_node,
             rviz2
         ]
     )

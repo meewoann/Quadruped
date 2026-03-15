@@ -43,7 +43,7 @@
                     <plugin name="gazebo_ros_imu_sensor" filename="libgazebo_ros_imu_sensor.so">
                         <ros>
                             <namespace>/imu</namespace>
-                            <argument>~/out:=data</argument>
+                            <argument>~/out:=data_raw</argument>
                         </ros>
                         <!-- <updateRate>50.0</updateRate>
                         <bodyName>imu_link</bodyName>

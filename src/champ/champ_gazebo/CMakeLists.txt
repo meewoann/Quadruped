@@ -22,9 +22,13 @@ set(dependencies
 
 install(PROGRAMS
   scripts/imu_sensor.py
+  scripts/imu_filter_node.py
+  scripts/imu_filter_quadruped.py
+  scripts/imu_2d_filter.py
+  scripts/image_crop_node.py
   scripts/odometry_tf.py
   scripts/odometry.py
-  DESTINATION bin
+  DESTINATION lib/${PROJECT_NAME}
 )
 
 include_directories(

@@ -34,7 +34,7 @@ def generate_launch_description():
     gait_config = os.path.join(config_pkg_share, "config/gait/gait.yaml")
     links_config = os.path.join(config_pkg_share, "config/links/links.yaml")
     default_model_path = os.path.join(descr_pkg_share, "urdf/champ.urdf.xacro")
-    default_world_path = os.path.join(config_pkg_share, "worlds/empty.world")
+    default_world_path = os.path.join(config_pkg_share, "worlds/playground.world")
 
     declare_use_sim_time = DeclareLaunchArgument(
         "use_sim_time",
@@ -91,6 +91,7 @@ def generate_launch_description():
             "hardware_connected": "false",
             "publish_foot_contacts": "false",
             "close_loop_odom": "true",
+            "use_imu_filter": "true",
         }.items(),
     )
 
@@ -115,6 +116,14 @@ def generate_launch_description():
         }.items(),
     )
 
+    image_crop_node = Node(
+        package="champ_gazebo",
+        executable="image_crop_node.py",
+        name="image_crop_node",
+        output="screen",
+        parameters=[{"use_sim_time": LaunchConfiguration("use_sim_time")}],
+    )
+
     return LaunchDescription(
         [
             declare_use_sim_time,
@@ -128,7 +137,7 @@ def generate_launch_description():
             declare_world_init_y,
             declare_world_init_heading,
             bringup_ld,
-            gazebo_ld
-
+            gazebo_ld,
+            image_crop_node,
         ]
     )
